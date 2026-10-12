@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "YPA Sasula",
+    "slug": "ypa-sasula",
+    "scheme": "ypasasula",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "site.bwongo.ypasasula" },
+    "android": { "package": "site.bwongo.ypasasula" },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "YPA Sasula needs camera access to scan member QR cards and verify discounts." }]
+    ]
+  }
+}

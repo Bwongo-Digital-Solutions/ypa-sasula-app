@@ -3,6 +3,8 @@ name: Build Android APK for releases
 on:
   release:
     types: [published]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -80,7 +82,7 @@ jobs:
           text = path.read_text()
 
           # Insert the stable release signing entry into the generated signingConfigs block.
-          signing_match = re.search(r"(?m)^(\s*)signingConfigs\s*\{", text)
+          signing_match = re.search(r"(?m)^([ \\t]*)signingConfigs[ \\t]*\\{", text)
           if signing_match:
               open_brace = text.index("{", signing_match.start())
               depth = 0
@@ -106,7 +108,7 @@ jobs:
           '''
               text = text[:close_brace] + signing_block + text[close_brace:]
           else:
-              build_types = re.search(r"(?m)^(\s*)buildTypes\s*\{", text)
+              build_types = re.search(r"(?m)^([ \\t]*)buildTypes[ \\t]*\\{", text)
               if not build_types:
                   raise SystemExit("Could not find buildTypes block in generated Gradle file.")
               indent = build_types.group(1)
@@ -122,8 +124,8 @@ jobs:
           '''
               text = text[:build_types.start()] + signing_block + text[build_types.start():]
 
-          build_types = re.search(r"(?m)^\s*buildTypes\s*\{", text)
-          release = re.search(r"(?m)^(\s*)release\s*\{", text[build_types.end():])
+          build_types = re.search(r"(?m)^[ \\t]*buildTypes[ \\t]*\\{", text)
+          release = re.search(r"(?m)^([ \\t]*)release[ \\t]*\\{", text[build_types.end():])
           if not build_types or not release:
               raise SystemExit("Could not find release build type in generated Gradle file.")
           release_start = build_types.end() + release.start()
@@ -144,7 +146,7 @@ jobs:
           if release_block_end is None:
               raise SystemExit("Could not parse release build type.")
           release_block = text[release_block_start:release_block_end]
-          release_block = re.sub(r"signingConfig\s+signingConfigs\.debug", "signingConfig signingConfigs.release", release_block)
+          release_block = re.sub(r"signingConfig[ \\t]+signingConfigs\\.debug", "signingConfig signingConfigs.release", release_block)
           text = text[:release_block_start] + release_block + text[release_block_end:]
           path.write_text(text)
           PY

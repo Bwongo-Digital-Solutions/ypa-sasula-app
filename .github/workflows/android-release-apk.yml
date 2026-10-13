@@ -38,6 +38,22 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Set Android app version and version code
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const file = "app.json";
+          const config = JSON.parse(fs.readFileSync(file, "utf8"));
+          const releaseTag = process.env.RELEASE_TAG || "";
+          const semver = releaseTag.replace(/^v/, "");
+          if (process.env.GITHUB_EVENT_NAME === "release" && /^\\d+\\.\\d+\\.\\d+([+-][0-9A-Za-z.-]+)?$/.test(semver)) {
+            config.expo.version = semver;
+          }
+          config.expo.android = config.expo.android || {};
+          config.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER);
+          fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\\n");
+          NODE
+
       - name: Generate Android native project
         run: npx expo prebuild --platform android --non-interactive
 

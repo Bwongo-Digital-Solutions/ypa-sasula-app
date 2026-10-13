@@ -58,3 +58,12 @@ SMS/push notifications, biometric fingerprint readers, member ordering/fulfilmen
 
 - **Mobile app:** this repository.
 - **Web portal + Node.js API + PostgreSQL schema:** [ypa-sasula-webapp](https://github.com/Bwongo-Digital-Solutions/ypa-sasula-webapp).
+
+
+## Android APK releases
+
+Every published GitHub Release triggers [the Android APK workflow](.github/workflows/android-release-apk.yml). It creates the native Android project with Expo, increments Android's version code, builds an APK, uploads it as a workflow artifact, and attaches it to the release. You can also start the workflow manually from the Actions tab.
+
+Set the repository variable `EXPO_PUBLIC_API_URL` to the deployed YPA API base URL including `/api/v1`; otherwise the build emits a warning and uses the app's localhost development fallback.
+
+For stable, upgradeable production APKs, configure these repository Actions secrets with a persistent Android release keystore: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Without those secrets the workflow produces an installable debug-signed APK for testing, not a production release signature. Do not rotate or replace the release keystore for future app updates.

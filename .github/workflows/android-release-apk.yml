@@ -46,12 +46,12 @@ jobs:
           const config = JSON.parse(fs.readFileSync(file, "utf8"));
           const releaseTag = process.env.RELEASE_TAG || "";
           const semver = releaseTag.replace(/^v/, "");
-          if (process.env.GITHUB_EVENT_NAME === "release" && /^\\d+\\.\\d+\\.\\d+([+-][0-9A-Za-z.-]+)?$/.test(semver)) {
+          if (process.env.GITHUB_EVENT_NAME === "release" && /^\d+\.\d+\.\d+([+-][0-9A-Za-z.-]+)?$/.test(semver)) {
             config.expo.version = semver;
           }
           config.expo.android = config.expo.android || {};
           config.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER);
-          fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\\n");
+          fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
           NODE
 
       - name: Generate Android native project
@@ -80,7 +80,7 @@ jobs:
           text = path.read_text()
 
           # Insert the stable release signing entry into the generated signingConfigs block.
-          signing_match = re.search(r"(?m)^(\\s*)signingConfigs\\s*\\{", text)
+          signing_match = re.search(r"(?m)^(\s*)signingConfigs\s*\{", text)
           if signing_match:
               open_brace = text.index("{", signing_match.start())
               depth = 0
@@ -106,7 +106,7 @@ jobs:
           '''
               text = text[:close_brace] + signing_block + text[close_brace:]
           else:
-              build_types = re.search(r"(?m)^(\\s*)buildTypes\\s*\\{", text)
+              build_types = re.search(r"(?m)^(\s*)buildTypes\s*\{", text)
               if not build_types:
                   raise SystemExit("Could not find buildTypes block in generated Gradle file.")
               indent = build_types.group(1)
@@ -122,13 +122,13 @@ jobs:
           '''
               text = text[:build_types.start()] + signing_block + text[build_types.start():]
 
-          build_types = re.search(r"(?m)^\\s*buildTypes\\s*\\{", text)
-          release = re.search(r"(?m)^(\\s*)release\\s*\\{", text[build_types.end():])
+          build_types = re.search(r"(?m)^\s*buildTypes\s*\{", text)
+          release = re.search(r"(?m)^(\s*)release\s*\{", text[build_types.end():])
           if not build_types or not release:
               raise SystemExit("Could not find release build type in generated Gradle file.")
           release_start = build_types.end() + release.start()
           brace = text.index("{", release_start)
-          text = text[:brace + 1] + "\\n" + release.group(1) + "    signingConfig signingConfigs.release" + text[brace + 1:]
+          text = text[:brace + 1] + "\n" + release.group(1) + "    signingConfig signingConfigs.release" + text[brace + 1:]
           # If the Expo template already assigned the debug key to release, replace it.
           release_block_start = text.index("release {", build_types.end())
           depth = 0
@@ -144,7 +144,7 @@ jobs:
           if release_block_end is None:
               raise SystemExit("Could not parse release build type.")
           release_block = text[release_block_start:release_block_end]
-          release_block = re.sub(r"signingConfig\\s+signingConfigs\\.debug", "signingConfig signingConfigs.release", release_block)
+          release_block = re.sub(r"signingConfig\s+signingConfigs\.debug", "signingConfig signingConfigs.release", release_block)
           text = text[:release_block_start] + release_block + text[release_block_end:]
           path.write_text(text)
           PY

@@ -1,0 +1,166 @@
+name: Build Android APK for releases
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.event.release.tag_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  android-apk:
+    name: Build YPA Sasula Android APK
+    runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || format('build-{0}', github.run_number) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Android native project
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Build APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p dist
+
+          if [[ -n "${ANDROID_KEYSTORE_BASE64:-}" && -n "${ANDROID_KEYSTORE_PASSWORD:-}" && -n "${ANDROID_KEY_ALIAS:-}" && -n "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/ypa-release.keystore
+            chmod 600 android/app/ypa-release.keystore
+
+            python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/app/build.gradle")
+          text = path.read_text()
+
+          # Insert the stable release signing entry into the generated signingConfigs block.
+          signing_match = re.search(r"(?m)^(\\s*)signingConfigs\\s*\\{", text)
+          if signing_match:
+              open_brace = text.index("{", signing_match.start())
+              depth = 0
+              close_brace = None
+              for index in range(open_brace, len(text)):
+                  if text[index] == "{":
+                      depth += 1
+                  elif text[index] == "}":
+                      depth -= 1
+                      if depth == 0:
+                          close_brace = index
+                          break
+              if close_brace is None:
+                  raise SystemExit("Could not parse signingConfigs block in generated Gradle file.")
+              indent = signing_match.group(1) + "    "
+              signing_block = f'''
+          {indent}release {{
+          {indent}    storeFile file("ypa-release.keystore")
+          {indent}    storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+          {indent}    keyAlias System.getenv("ANDROID_KEY_ALIAS")
+          {indent}    keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+          {indent}}}
+          '''
+              text = text[:close_brace] + signing_block + text[close_brace:]
+          else:
+              build_types = re.search(r"(?m)^(\\s*)buildTypes\\s*\\{", text)
+              if not build_types:
+                  raise SystemExit("Could not find buildTypes block in generated Gradle file.")
+              indent = build_types.group(1)
+              signing_block = f'''{indent}signingConfigs {{
+          {indent}    release {{
+          {indent}        storeFile file("ypa-release.keystore")
+          {indent}        storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+          {indent}        keyAlias System.getenv("ANDROID_KEY_ALIAS")
+          {indent}        keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+          {indent}    }}
+          {indent}}}
+
+          '''
+              text = text[:build_types.start()] + signing_block + text[build_types.start():]
+
+          build_types = re.search(r"(?m)^\\s*buildTypes\\s*\\{", text)
+          release = re.search(r"(?m)^(\\s*)release\\s*\\{", text[build_types.end():])
+          if not build_types or not release:
+              raise SystemExit("Could not find release build type in generated Gradle file.")
+          release_start = build_types.end() + release.start()
+          brace = text.index("{", release_start)
+          text = text[:brace + 1] + "\\n" + release.group(1) + "    signingConfig signingConfigs.release" + text[brace + 1:]
+          # If the Expo template already assigned the debug key to release, replace it.
+          release_block_start = text.index("release {", build_types.end())
+          depth = 0
+          release_block_end = None
+          for index in range(text.index("{", release_block_start), len(text)):
+              if text[index] == "{":
+                  depth += 1
+              elif text[index] == "}":
+                  depth -= 1
+                  if depth == 0:
+                      release_block_end = index
+                      break
+          if release_block_end is None:
+              raise SystemExit("Could not parse release build type.")
+          release_block = text[release_block_start:release_block_end]
+          release_block = re.sub(r"signingConfig\\s+signingConfigs\\.debug", "signingConfig signingConfigs.release", release_block)
+          text = text[:release_block_start] + release_block + text[release_block_end:]
+          path.write_text(text)
+          PY
+
+            (cd android && ./gradlew --no-daemon assembleRelease)
+            cp android/app/build/outputs/apk/release/app-release.apk "dist/YPA-Sasula-${RELEASE_TAG}.apk"
+            echo "APK_TYPE=release-signed" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Android signing secrets are not all configured. Building an installable debug-signed APK; configure the ANDROID_KEYSTORE_* secrets for stable signed release APKs."
+            (cd android && ./gradlew --no-daemon assembleDebug)
+            cp android/app/build/outputs/apk/debug/app-debug.apk "dist/YPA-Sasula-${RELEASE_TAG}-debug.apk"
+            echo "APK_TYPE=debug-signed" >> "$GITHUB_ENV"
+          fi
+
+          if [[ -z "${EXPO_PUBLIC_API_URL:-}" ]]; then
+            echo "::warning::Repository variable EXPO_PUBLIC_API_URL is unset. The app will use its localhost development fallback until rebuilt with the deployed API URL."
+          fi
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YPA-Sasula-Android-${{ env.RELEASE_TAG }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attach APK to the GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: dist/*.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

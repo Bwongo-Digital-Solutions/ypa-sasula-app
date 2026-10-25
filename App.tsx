@@ -5,6 +5,7 @@ import QRCode from "react-native-qrcode-svg";
 import { StatusBar } from "expo-status-bar";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+const NO_AUTH_TEST_MODE = process.env.EXPO_PUBLIC_NO_AUTH_TEST_MODE === "true";
 type Role = "admin" | "staff" | "member";
 type User = { id: string; displayName: string; email: string; role: Role; locationId: string | null; memberId: string | null };
 type CatalogItem = { id: string; name: string; price: number; sku: string | null };
@@ -14,6 +15,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [testRole, setTestRole] = useState<Role>("admin");
   const [token, setToken] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [member, setMember] = useState<MemberProfile | null>(null);
@@ -59,7 +61,7 @@ export default function App() {
   const signIn = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+      const response = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(NO_AUTH_TEST_MODE ? { testRole } : { email, password }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Sign-in failed.");
       setToken(payload.token); setUser(payload.user);
@@ -101,11 +103,13 @@ export default function App() {
   return <SafeAreaView style={styles.safe}><StatusBar style="dark" /><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <View style={styles.brandRow}><Image source={require("./assets/ypa-logo.jpg")} style={styles.brandLogo} resizeMode="contain" /><View><Text style={styles.brandTitle}>YPA Sasula</Text><Text style={styles.brandSub}>Member discounts, made visible</Text></View></View>
     {!user ? <View style={styles.panel}>
-      <Text style={styles.heading}>Sign in</Text><Text style={styles.muted}>Use the account provided by YPA.</Text>
-      <Text style={styles.label}>Email address</Text><TextInput autoCapitalize="none" keyboardType="email-address" style={styles.input} value={email} onChangeText={setEmail} placeholder="name@example.com" />
+      <Text style={styles.heading}>{NO_AUTH_TEST_MODE ? "Test access (no credentials)" : "Sign in"}</Text><Text style={styles.muted}>{NO_AUTH_TEST_MODE ? "Development-only shortcut. Select a role; an existing active account of that role is used." : "Use the account provided by YPA."}</Text>
+      {NO_AUTH_TEST_MODE && <View style={styles.paymentRow}>{(["admin", "staff", "member"] as Role[]).map((role) => <TouchableOpacity key={role} style={[styles.paymentOption, testRole === role && styles.paymentOptionActive]} onPress={() => setTestRole(role)}><Text style={[styles.paymentOptionText, testRole === role && styles.paymentOptionTextActive]}>{role.toUpperCase()}</Text></TouchableOpacity>)}</View>
+      {!NO_AUTH_TEST_MODE && <><Text style={styles.label}>Email address</Text><TextInput autoCapitalize="none" keyboardType="email-address" style={styles.input} value={email} onChangeText={setEmail} placeholder="name@example.com" />
       <Text style={styles.label}>Password</Text><View style={styles.passwordField}><TextInput secureTextEntry={!showPassword} style={styles.passwordInput} value={password} onChangeText={setPassword} placeholder="Your password" autoCapitalize="none" autoCorrect={false} /><TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} onPress={() => setShowPassword((visible) => !visible)} style={styles.passwordToggle}><Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "👁"}</Text></TouchableOpacity></View>
+      </>}
       <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Signing in…" : "Sign in"}</Text></TouchableOpacity>
-      <Text style={styles.mutedSmall}>For local testing, set EXPO_PUBLIC_API_URL to your computer's reachable LAN address.</Text>
+      <Text style={styles.mutedSmall}>{NO_AUTH_TEST_MODE ? "NO-AUTH TEST BUILD — never use this mode in production." : "For local testing, set EXPO_PUBLIC_API_URL to your computer's reachable LAN address."}</Text>
     </View> : <>
       <View style={styles.welcomeRow}><View><Text style={styles.eyebrow}>{user.role.toUpperCase()} PROFILE</Text><Text style={styles.heading}>Hello, {user.displayName.split(" ")[0]}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.signOut}>Sign out</Text></TouchableOpacity></View>
       {user.role === "member" && member && <View style={styles.panel}>

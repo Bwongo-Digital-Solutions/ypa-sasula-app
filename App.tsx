@@ -114,7 +114,7 @@ export default function App() {
         <View style={styles.statusPill}><Text style={styles.statusText}>{member.status.toUpperCase()}</Text></View>
         <View style={styles.memberStats}><View><Text style={styles.statLabel}>Your discount</Text><Text style={styles.statValue}>{member.discountRate}%</Text></View><View><Text style={styles.statLabel}>Wallet balance</Text><Text style={styles.statValue}>UGX {member.walletBalance.toLocaleString()}</Text></View></View>
         <Text style={styles.sectionTitle}>Your YPA stake</Text>
-        {member.assets.length ? member.assets.map((asset) => <View style={styles.listRow} key={asset.id}><Text style={styles.itemName}>{asset.asset_type}</Text><Text style={styles.price}>{asset.quantity} {asset.unit ?? ""}</Text></View>) : <Text style={styles.muted}>No stake records have been added to your profile yet.</Text>}
+        {member.assets.length ? member.assets.map((asset) => <View style={styles.listRow} key={asset.id}><Text style={styles.itemName}>{asset.asset_type}</Text><Text style={styles.price}>{asset.quantity} {asset.unit ?? "unit"}</Text></View>) : <Text style={styles.muted}>No stake records have been added to your profile yet.</Text>}
       </View>}
       {user.role === "admin" && <View style={styles.panel}><Text style={styles.heading}>Administrator access</Text><Text style={styles.muted}>Use the web portal for live sales analytics, location-level reports, member and staff management, and the full audit trail.</Text></View>}
       {user.role === "staff" && <View style={styles.panel}>
@@ -130,7 +130,8 @@ export default function App() {
         <View style={styles.paymentRow}>{(["cash", "mobile_money", "bank", "wallet"] as const).map((method) =>
           <TouchableOpacity key={method} style={[styles.paymentOption, paymentMethod === method && styles.paymentOptionActive]} onPress={() => setPaymentMethod(method)}>
             <Text style={[styles.paymentOptionText, paymentMethod === method && styles.paymentOptionTextActive]}>{method.replace("_", " ")}</Text>
-          </TouchableOpacity>)}</View>
+          </TouchableOpacity>)}
+        </View>
         <TouchableOpacity style={styles.primaryButton} onPress={() => void recordSale()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Saving…" : "Record sale"}</Text></TouchableOpacity>
         <Text style={styles.mutedSmall}>Mobile money and bank settlement require provider integration; those methods are not marked as paid by this first version.</Text>
       </View>}
@@ -157,13 +158,48 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f3f7f4" }, container: { padding: 20, paddingTop: 32, paddingBottom: 48, maxWidth: 620, width: "100%", alignSelf: "center" },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 28 }, brandLogo: { width: 64, height: 62, backgroundColor: "#fff", borderRadius: 6 }, brandTitle: { fontSize: 18, color: "#039dfc", fontWeight: "800" }, brandSub: { fontSize: 11, color: "#687c70", marginTop: 3 },
-  panel: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#e0e8e2", padding: 20, marginBottom: 16 }, heading: { fontSize: 24, fontWeight: "800", color: "#173c2d", marginTop: 4, marginBottom: 8 }, muted: { fontSize: 13, lineHeight: 20, color: "#69796f", marginBottom: 14 }, mutedSmall: { fontSize: 11, lineHeight: 17, color: "#78877f", marginTop: 10 }, label: { fontSize: 12, fontWeight: "700", color: "#41584a", marginTop: 15, marginBottom: 7 }, input: { height: 46, borderWidth: 1, borderColor: "#cbd7cd", borderRadius: 8, paddingHorizontal: 12, backgroundColor: "#fff" },
-  primaryButton: { backgroundColor: "#039dfc", minHeight: 48, borderRadius: 8, alignItems: "center", justifyContent: "center", padding: 12, marginTop: 20 }, primaryText: { color: "#fff", fontSize: 14, fontWeight: "800" }, secondaryButton: { borderWidth: 1, borderColor: "#039dfc", minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", padding: 10, marginVertical: 10 }, secondaryText: { color: "#039dfc", fontSize: 13, fontWeight: "800" },
-  welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }, eyebrow: { letterSpacing: 1.2, color: "#6a7b70", fontSize: 10, fontWeight: "800" }, signOut: { color: "#039dfc", fontWeight: "700" }, memberNo: { color: "#597064", letterSpacing: 1.4, fontWeight: "700", fontSize: 12 },
-  qrBox: { backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 18, marginVertical: 20 }, statusPill: { alignSelf: "center", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 }, statusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 }, memberStats: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 22, borderBottomWidth: 1, borderColor: "#e9efea", marginBottom: 20 }, statLabel: { fontSize: 11, color: "#6b7c71", marginBottom: 6 }, statValue: { fontSize: 18, color: "#173c2d", fontWeight: "800" },
-  sectionTitle: { fontSize: 15, color: "#294537", fontWeight: "800", marginTop: 15, marginBottom: 5 }, listRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderColor: "#edf1ed" }, itemName: { fontSize: 13, color: "#263d30", fontWeight: "700" }, price: { fontSize: 13, color: "#14543a", fontWeight: "800" }, counterButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: "#b6cabc" }, counterText: { color: "#0c633f", fontWeight: "800", fontSize: 18 }, quantity: { minWidth: 20, textAlign: "center", fontWeight: "800" },
+  safe: { flex: 1, backgroundColor: "#f3f7f4" },
+  container: { padding: 20, paddingTop: 32, paddingBottom: 48, maxWidth: 620, width: "100%", alignSelf: "center" },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 28 },
+  brandLogo: { width: 64, height: 62, backgroundColor: "#fff", borderRadius: 6 },
+  brandTitle: { fontSize: 18, color: "#039dfc", fontWeight: "800" },
+  brandSub: { fontSize: 11, color: "#687c70", marginTop: 3 },
+  panel: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#e0e8e2", padding: 20, marginBottom: 16 },
+  heading: { fontSize: 24, fontWeight: "800", color: "#173c2d", marginTop: 4, marginBottom: 8 },
+  muted: { fontSize: 13, lineHeight: 20, color: "#69796f", marginBottom: 14 },
+  mutedSmall: { fontSize: 11, lineHeight: 17, color: "#78877f", marginTop: 10 },
+  label: { fontSize: 12, fontWeight: "700", color: "#41594a", marginTop: 15, marginBottom: 7 },
+  input: { height: 46, borderWidth: 1, borderColor: "#cbd7ce", borderRadius: 8, paddingHorizontal: 12, backgroundColor: "#fff" },
+  primaryButton: { backgroundColor: "#039dfc", minHeight: 48, borderRadius: 8, alignItems: "center", justifyContent: "center", padding: 12, marginTop: 20 },
+  primaryText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  secondaryButton: { borderWidth: 1, borderColor: "#039dfc", minHeight: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", padding: 10, marginVertical: 12 },
+  secondaryText: { color: "#039dfc", fontSize: 13, fontWeight: "800" },
+  welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  eyebrow: { letterSpacing: 1.2, color: "#6a7b70", fontSize: 10, fontWeight: "800" },
+  signOut: { color: "#039dfc", fontWeight: "700" },
+  memberNo: { color: "#596f63", letterSpacing: 1.4, fontWeight: "700", fontSize: 12 },
+  qrBox: { backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 18, marginVertical: 20 },
+  statusPill: { alignSelf: "center", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  statusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
+  memberStats: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 22, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#edf1ed" },
+  statLabel: { fontSize: 11, color: "#6b7c70", marginBottom: 6 },
+  statValue: { fontSize: 18, color: "#173c2d", fontWeight: "800" },
+  sectionTitle: { fontSize: 15, color: "#294537", fontWeight: "800", marginTop: 15, marginBottom: 5 },
+  listRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: "#edf1ed" },
+  itemName: { fontSize: 13, color: "#263d30", fontWeight: "700", flex: 1 },
+  price: { fontSize: 13, color: "#14543a", fontWeight: "800" },
+  counterButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: "#b6cabd" },
+  counterText: { color: "#0c633f", fontSize: 20, fontWeight: "700" },
+  quantity: { minWidth: 20, textAlign: "center", fontWeight: "800", color: "#173c2d" },
+  paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 },
+  paymentOption: { borderWidth: 1, borderColor: "#cbd8ce", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 10 },
+  paymentOptionActive: { borderColor: "#039dfc", backgroundColor: "#e5f5ff" },
+  paymentOptionText: { textTransform: "capitalize", color: "#52675a", fontSize: 11, fontWeight: "700" },
+  paymentOptionTextActive: { color: "#039dfc" },
+  cameraFrame: { height: 340, borderRadius: 12, overflow: "hidden", marginVertical: 12 },
+  camera: { flex: 1 },
+  verifiedBox: { borderRadius: 10, backgroundColor: "#e5f5ff", padding: 14, marginTop: 10 },
+  verifiedTitle: { fontWeight: "800", color: "#1b683e" },
   receiptPanel: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#b8dff7", padding: 20, marginBottom: 16 },
   receiptBrand: { alignItems: "center", borderBottomWidth: 2, borderBottomColor: "#039dfc", paddingBottom: 16, marginBottom: 14 },
   receiptLogo: { width: 86, height: 74, marginBottom: 8 },
@@ -180,6 +216,9 @@ const styles = StyleSheet.create({
   receiptStatus: { alignSelf: "flex-start", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 12 },
   receiptStatusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
   receiptFooter: { color: "#78877f", fontSize: 11, textAlign: "center", marginTop: 16, lineHeight: 17 },
-  paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 }, paymentOption: { borderWidth: 1, borderColor: "#cbd8ce", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 11 }, paymentOptionActive: { borderColor: "#039dfc", backgroundColor: "#e5f5ff" }, paymentOptionText: { textTransform: "capitalize", color: "#52675a", fontSize: 11, fontWeight: "700" }, paymentOptionTextActive: { color: "#039dfc" },
-  cameraFrame: { height: 340, borderRadius: 12, overflow: "hidden", marginVertical: 12 }, camera: { flex: 1 }, verifiedBox: { borderRadius: 10, backgroundColor: "#e5f5ff", padding: 14, marginTop: 10 }, verifiedTitle: { fontWeight: "800", color: "#1b683e" }, link: { color: "#0c6a4b", textDecorationLine: "underline", marginTop: 8, fontSize: 12 }, footer: { color: "#839087", textAlign: "center", fontSize: 10, marginTop: 20 }
-});
+  passwordRow: { flexDirection: "row", alignItems: "center" },
+  passwordInput: { flex: 1 },
+  passwordToggle: { marginLeft: 10, justifyContent: "center" },
+  link: { color: "#0c6a4b", textDecorationLine: "underline", fontSize: 12, fontWeight: "700", marginTop: 8 },
+  footer: { color: "#83908a", textAlign: "center", fontSize: 10, marginTop: 20 }
+}));

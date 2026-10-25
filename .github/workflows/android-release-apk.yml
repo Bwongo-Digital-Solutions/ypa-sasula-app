@@ -3,8 +3,6 @@ name: Build Android APK for releases
 on:
   release:
     types: [published]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -70,7 +68,13 @@ jobs:
           mkdir -p dist
           SAFE_RELEASE_TAG="${RELEASE_TAG//\//-}"
 
-          if [[ -n "${ANDROID_KEYSTORE_BASE64:-}" && -n "${ANDROID_KEYSTORE_PASSWORD:-}" && -n "${ANDROID_KEY_ALIAS:-}" && -n "${ANDROID_KEY_PASSWORD:-}" ]]; then
+          # Never publish a debug-signed APK. Missing signing credentials must fail the workflow.
+          for secret_name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!secret_name:-}" ]]; then
+              echo "::error::Required GitHub Actions secret ${secret_name} is missing. Configure all ANDROID_KEYSTORE_* secrets before building a release APK."
+              exit 1
+            fi
+          done
             echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/ypa-release.keystore
             chmod 600 android/app/ypa-release.keystore
 
@@ -152,13 +156,11 @@ jobs:
           PY
 
             (cd android && ./gradlew --no-daemon assembleRelease)
-            cp android/app/build/outputs/apk/release/app-release.apk "dist/YPA-Sasula-${SAFE_RELEASE_TAG}.apk"
+            RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
+            test -s "$RELEASE_APK"
+            jarsigner -verify -verbose -certs "$RELEASE_APK" >/dev/null
+            cp "$RELEASE_APK" "dist/YPA-Sasula-${SAFE_RELEASE_TAG}-release-signed.apk"
             echo "APK_TYPE=release-signed" >> "$GITHUB_ENV"
-          else
-            echo "::warning::Android signing secrets are not all configured. Building an installable debug-signed APK; configure the ANDROID_KEYSTORE_* secrets for stable signed release APKs."
-            (cd android && ./gradlew --no-daemon assembleDebug)
-            cp android/app/build/outputs/apk/debug/app-debug.apk "dist/YPA-Sasula-${SAFE_RELEASE_TAG}-debug.apk"
-            echo "APK_TYPE=debug-signed" >> "$GITHUB_ENV"
           fi
 
           if [[ -z "${EXPO_PUBLIC_API_URL:-}" ]]; then
@@ -166,11 +168,10 @@ jobs:
           fi
 
       - name: Upload APK as workflow artifact
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: YPA-Sasula-Android-${{ env.RELEASE_TAG }}
-          path: dist/*.apk
+          path: dist/*-release-signed.apk
           if-no-files-found: error
           retention-days: 7
 
@@ -179,7 +180,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: dist/*.apk
+          files: dist/*-release-signed.apk
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

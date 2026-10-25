@@ -56,7 +56,7 @@ jobs:
       - name: Generate Android native project
         run: npx expo prebuild --platform android --non-interactive
 
-      - name: Build APK
+      - name: Build signed release APK only
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -68,41 +68,43 @@ jobs:
           mkdir -p dist
           SAFE_RELEASE_TAG="${RELEASE_TAG//\//-}"
 
-          # Never publish a debug-signed APK. Missing signing credentials must fail the workflow.
+          # Do not fall back to a debug build. Require all credentials before Gradle runs.
           for secret_name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
             if [[ -z "${!secret_name:-}" ]]; then
-              echo "::error::Required GitHub Actions secret ${secret_name} is missing. Configure all ANDROID_KEYSTORE_* secrets before building a release APK."
+              echo "::error::Missing required secret: ${secret_name}. Configure all four ANDROID_KEYSTORE_* repository secrets to build a signed release APK."
               exit 1
             fi
           done
-            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/ypa-release.keystore
-            chmod 600 android/app/ypa-release.keystore
 
-            python3 - <<'PY'
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/ypa-release.keystore
+          chmod 600 android/app/ypa-release.keystore
+          keytool -list -keystore android/app/ypa-release.keystore -storepass "${ANDROID_KEYSTORE_PASSWORD}" -alias "${ANDROID_KEY_ALIAS}" >/dev/null
+
+          python3 - <<'PY'
           from pathlib import Path
           import re
 
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          # Insert the stable release signing entry into the generated signingConfigs block.
-          signing_match = re.search(r"(?m)^([ \t]*)signingConfigs[ \t]*\{", text)
-          if signing_match:
-              open_brace = text.index("{", signing_match.start())
-              depth = 0
-              close_brace = None
-              for index in range(open_brace, len(text)):
-                  if text[index] == "{":
-                      depth += 1
-                  elif text[index] == "}":
-                      depth -= 1
-                      if depth == 0:
-                          close_brace = index
-                          break
-              if close_brace is None:
-                  raise SystemExit("Could not parse signingConfigs block in generated Gradle file.")
-              indent = signing_match.group(1) + "    "
-              signing_block = f'''
+          signing_match = re.search(r"(?m)^([ \\t]*)signingConfigs[ \\t]*\\{", text)
+          if not signing_match:
+              raise SystemExit("Could not find signingConfigs block in generated Gradle file.")
+          open_brace = text.index("{", signing_match.start())
+          depth = 0
+          close_brace = None
+          for index in range(open_brace, len(text)):
+              if text[index] == "{":
+                  depth += 1
+              elif text[index] == "}":
+                  depth -= 1
+                  if depth == 0:
+                      close_brace = index
+                      break
+          if close_brace is None:
+              raise SystemExit("Could not parse signingConfigs block.")
+          indent = signing_match.group(1) + "    "
+          release_signing = f'''
           {indent}release {{
           {indent}    storeFile file("ypa-release.keystore")
           {indent}    storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -110,61 +112,47 @@ jobs:
           {indent}    keyPassword System.getenv("ANDROID_KEY_PASSWORD")
           {indent}}}
           '''
-              text = text[:close_brace] + signing_block + text[close_brace:]
-          else:
-              build_types = re.search(r"(?m)^([ \t]*)buildTypes[ \t]*\{", text)
-              if not build_types:
-                  raise SystemExit("Could not find buildTypes block in generated Gradle file.")
-              indent = build_types.group(1)
-              signing_block = f'''{indent}signingConfigs {{
-          {indent}    release {{
-          {indent}        storeFile file("ypa-release.keystore")
-          {indent}        storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-          {indent}        keyAlias System.getenv("ANDROID_KEY_ALIAS")
-          {indent}        keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-          {indent}    }}
-          {indent}}}
+          text = text[:close_brace] + release_signing + text[close_brace:]
 
-          '''
-              text = text[:build_types.start()] + signing_block + text[build_types.start():]
-
-          build_types = re.search(r"(?m)^[ \t]*buildTypes[ \t]*\{", text)
-          release = re.search(r"(?m)^([ \t]*)release[ \t]*\{", text[build_types.end():])
-          if not build_types or not release:
-              raise SystemExit("Could not find release build type in generated Gradle file.")
+          build_types = re.search(r"(?m)^([ \\t]*)buildTypes[ \\t]*\\{", text)
+          if not build_types:
+              raise SystemExit("Could not find buildTypes block.")
+          tail = text[build_types.end():]
+          release = re.search(r"(?m)^([ \\t]*)release[ \\t]*\\{", tail)
+          if not release:
+              raise SystemExit("Could not find release build type.")
           release_start = build_types.end() + release.start()
-          brace = text.index("{", release_start)
-          text = text[:brace + 1] + "\n" + release.group(1) + "    signingConfig signingConfigs.release" + text[brace + 1:]
-          # If the Expo template already assigned the debug key to release, replace it.
-          release_block_start = text.index("release {", build_types.end())
+          release_open = text.index("{", release_start)
           depth = 0
-          release_block_end = None
-          for index in range(text.index("{", release_block_start), len(text)):
+          release_close = None
+          for index in range(release_open, len(text)):
               if text[index] == "{":
                   depth += 1
               elif text[index] == "}":
                   depth -= 1
                   if depth == 0:
-                      release_block_end = index
+                      release_close = index
                       break
-          if release_block_end is None:
+          if release_close is None:
               raise SystemExit("Could not parse release build type.")
-          release_block = text[release_block_start:release_block_end]
-          release_block = re.sub(r"signingConfig[ \t]+signingConfigs\.debug", "signingConfig signingConfigs.release", release_block)
-          text = text[:release_block_start] + release_block + text[release_block_end:]
+          release_block = text[release_start:release_close]
+          release_block = re.sub(r"(?m)^([ \\t]*)signingConfig[ \\t]+signingConfigs\\.debug[ \\t]*$", r"\\1signingConfig signingConfigs.release", release_block)
+          if "signingConfig signingConfigs.release" not in release_block:
+              release_block = re.sub(r"(?m)^([ \\t]*)release[ \\t]*\\{", r"\\1release {\\n\\1    signingConfig signingConfigs.release", release_block, count=1)
+          text = text[:release_start] + release_block + text[release_close:]
           path.write_text(text)
           PY
 
-            (cd android && ./gradlew --no-daemon assembleRelease)
-            RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
-            test -s "$RELEASE_APK"
-            jarsigner -verify -verbose -certs "$RELEASE_APK" >/dev/null
-            cp "$RELEASE_APK" "dist/YPA-Sasula-${SAFE_RELEASE_TAG}-release-signed.apk"
-            echo "APK_TYPE=release-signed" >> "$GITHUB_ENV"
-          fi
+          (cd android && ./gradlew --no-daemon assembleRelease)
+          RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$RELEASE_APK"
+          jarsigner -verify "$RELEASE_APK" >/dev/null
+          cp "$RELEASE_APK" "dist/YPA-Sasula-${SAFE_RELEASE_TAG}-release-signed.apk"
+          echo "APK_TYPE=release-signed" >> "$GITHUB_ENV"
 
           if [[ -z "${EXPO_PUBLIC_API_URL:-}" ]]; then
-            echo "::warning::Repository variable EXPO_PUBLIC_API_URL is unset. The app will use its localhost development fallback until rebuilt with the deployed API URL."
+            echo "::error::Repository variable EXPO_PUBLIC_API_URL is unset. Set it to the deployed API base URL before releasing; refusing to publish an APK configured for localhost."
+            exit 1
           fi
 
       - name: Upload APK as workflow artifact

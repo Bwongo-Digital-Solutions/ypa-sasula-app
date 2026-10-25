@@ -87,7 +87,7 @@ jobs:
           path = Path("android/app/build.gradle")
           text = path.read_text()
 
-          signing_match = re.search(r"(?m)^([ \\t]*)signingConfigs[ \\t]*\\{", text)
+          signing_match = re.search(r"(?m)^([ \t]*)signingConfigs[ \t]*\{", text)
           if not signing_match:
               raise SystemExit("Could not find signingConfigs block in generated Gradle file.")
           open_brace = text.index("{", signing_match.start())
@@ -114,11 +114,11 @@ jobs:
           '''
           text = text[:close_brace] + release_signing + text[close_brace:]
 
-          build_types = re.search(r"(?m)^([ \\t]*)buildTypes[ \\t]*\\{", text)
+          build_types = re.search(r"(?m)^([ \t]*)buildTypes[ \t]*\{", text)
           if not build_types:
               raise SystemExit("Could not find buildTypes block.")
           tail = text[build_types.end():]
-          release = re.search(r"(?m)^([ \\t]*)release[ \\t]*\\{", tail)
+          release = re.search(r"(?m)^([ \t]*)release[ \t]*\{", tail)
           if not release:
               raise SystemExit("Could not find release build type.")
           release_start = build_types.end() + release.start()
@@ -136,9 +136,9 @@ jobs:
           if release_close is None:
               raise SystemExit("Could not parse release build type.")
           release_block = text[release_start:release_close]
-          release_block = re.sub(r"(?m)^([ \\t]*)signingConfig[ \\t]+signingConfigs\\.debug[ \\t]*$", r"\1signingConfig signingConfigs.release", release_block)
+          release_block = re.sub(r"(?m)^([ \t]*)signingConfig[ \t]+signingConfigs\.debug[ \t]*$", r"\1signingConfig signingConfigs.release", release_block)
           if "signingConfig signingConfigs.release" not in release_block:
-              release_block = re.sub(r"(?m)^([ \\t]*)release[ \\t]*\\{", r"\1release {\n\1    signingConfig signingConfigs.release", release_block, count=1)
+          release_block = re.sub(r"(?m)^([ \t]*)signingConfig[ \t]+signingConfigs\.debug[ \t]*$", r"\1signingConfig signingConfigs.release", release_block)
           text = text[:release_start] + release_block + text[release_close:]
           path.write_text(text)
           PY

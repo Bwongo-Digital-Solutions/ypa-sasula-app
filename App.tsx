@@ -13,6 +13,7 @@ type MemberProfile = { memberNumber: string; firstName: string; lastName: string
 export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [token, setToken] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [member, setMember] = useState<MemberProfile | null>(null);
@@ -102,7 +103,7 @@ export default function App() {
     {!user ? <View style={styles.panel}>
       <Text style={styles.heading}>Sign in</Text><Text style={styles.muted}>Use the account provided by YPA.</Text>
       <Text style={styles.label}>Email address</Text><TextInput autoCapitalize="none" keyboardType="email-address" style={styles.input} value={email} onChangeText={setEmail} placeholder="name@example.com" />
-      <Text style={styles.label}>Password</Text><TextInput secureTextEntry style={styles.input} value={password} onChangeText={setPassword} placeholder="Your password" />
+      <Text style={styles.label}>Password</Text><View style={styles.passwordRow}><TextInput secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} style={[styles.input, styles.passwordInput]} value={password} onChangeText={setPassword} placeholder="Your password" textContentType="password" autoComplete="password" /><TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} onPress={() => setShowPassword((visible) => !visible)} style={styles.passwordToggle}><Text style={styles.link}>{showPassword ? "Hide" : "Show"}</Text></TouchableOpacity></View>
       <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Signing in…" : "Sign in"}</Text></TouchableOpacity>
       <Text style={styles.mutedSmall}>For local testing, set EXPO_PUBLIC_API_URL to your computer's reachable LAN address.</Text>
     </View> : <>

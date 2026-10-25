@@ -25,13 +25,15 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the API base URL, including `/api/v1`. For an actual phone, use the computer's reachable LAN address rather than `localhost`:
+Set `EXPO_PUBLIC_API_URL` to the API base URL, including `/api/v1`. Choose the URL based on where the phone can reach the API:
 
-```dotenv
-EXPO_PUBLIC_API_URL=http://192.168.1.20:4000/api/v1
-```
+- **Public/deployed API:** use its HTTPS URL, e.g. `https://api.example.com/api/v1`.
+- **Same Wi-Fi network:** use the Ubuntu computer's reachable Wi-Fi/LAN IP, e.g. `http://192.168.1.20:4000/api/v1`.
+- **Bluetooth PAN:** use the Ubuntu computer's Bluetooth PAN IP, e.g. `http://10.20.30.1:4000/api/v1`. The example address is illustrative; use the address actually assigned to the Bluetooth interface and verify that the Android phone can reach it.
 
-Replace the example IP with your development computer's current local IP. The phone and computer must be able to communicate over the network. Use HTTPS for deployed environments.
+For Wi-Fi or Bluetooth testing, the API must listen on an interface reachable by the phone (commonly `0.0.0.0:4000`, not only `127.0.0.1:4000`). Keep the API running, ensure host firewall rules allow the connection on the trusted local link, and test connectivity before building. A successful Bluetooth pairing/PAN connection alone does not guarantee that HTTP traffic to the API works.
+
+Do not use `localhost` or `127.0.0.1` for a server running on the Ubuntu computer: on Android, those addresses refer to the phone itself. For deployed environments, use HTTPS. Do not expose the development API over public networks using plain HTTP.
 
 ## Run the app
 
@@ -59,11 +61,10 @@ SMS/push notifications, biometric fingerprint readers, member ordering/fulfilmen
 - **Mobile app:** this repository.
 - **Web portal + Node.js API + PostgreSQL schema:** [ypa-sasula-webapp](https://github.com/Bwongo-Digital-Solutions/ypa-sasula-webapp).
 
+## Android signed APK releases
 
-## Android APK releases
+Read **[Android APK Signing and API Connectivity](docs/ANDROID_APK_AND_API_CONNECTIVITY.md)** for the full release-signing setup, GitHub Actions configuration, and instructions for public API, Wi-Fi/LAN, and Bluetooth PAN connectivity.
 
-Every published GitHub Release triggers [the Android APK workflow](.github/workflows/android-release-apk.yml). It creates the native Android project with Expo, increments Android's version code, builds an APK, uploads it as a workflow artifact, and attaches it to the release. You can also start the workflow manually from the Actions tab.
+In brief, the workflow at [android-release-apk.yml](.github/workflows/android-release-apk.yml) runs when a GitHub Release is published or when manually dispatched from Actions. It builds **only a signed release APK**; it does not fall back to a debug APK. All four signing secrets and the `EXPO_PUBLIC_API_URL` repository variable must be configured or the workflow fails. The API URL is bundled into the APK at build time, so change the variable and rebuild when switching connection modes or addresses.
 
-Set the repository variable `EXPO_PUBLIC_API_URL` to the deployed YPA API base URL including `/api/v1`; otherwise the build emits a warning and uses the app's localhost development fallback.
-
-For stable, upgradeable production APKs, configure these repository Actions secrets with a persistent Android release keystore: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Without those secrets the workflow produces an installable debug-signed APK for testing, not a production release signature. Do not rotate or replace the release keystore for future app updates.
+Keep the release keystore and passwords safe. Future upgrades of the installed Android app must use the same signing key.

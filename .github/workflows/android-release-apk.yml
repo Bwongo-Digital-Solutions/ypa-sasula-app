@@ -166,12 +166,13 @@ jobs:
           fi
 
       - name: Upload APK as workflow artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: YPA-Sasula-Android-${{ env.RELEASE_TAG }}
           path: dist/*.apk
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7
 
       - name: Attach APK to the GitHub Release
         if: github.event_name == 'release'

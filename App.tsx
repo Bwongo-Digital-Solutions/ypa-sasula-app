@@ -114,7 +114,7 @@ export default function App() {
         <View style={styles.statusPill}><Text style={styles.statusText}>{member.status.toUpperCase()}</Text></View>
         <View style={styles.memberStats}><View><Text style={styles.statLabel}>Your discount</Text><Text style={styles.statValue}>{member.discountRate}%</Text></View><View><Text style={styles.statLabel}>Wallet balance</Text><Text style={styles.statValue}>UGX {member.walletBalance.toLocaleString()}</Text></View></View>
         <Text style={styles.sectionTitle}>Your YPA stake</Text>
-        {member.assets.length ? member.assets.map((asset) => <View style={styles.listRow} key={asset.id}><Text style={styles.itemName}>{asset.asset_type}</Text><Text style={styles.price}>{asset.quantity} {asset.unit ?? ""}</Text></View>) : <Text style={styles.muted}>No stake records have been added to your profile yet.</Text>}
+        {member.assets.length ? member.assets.map((asset) => <View style={styles.listRow} key={asset.id}><Text style={styles.itemName}>{asset.asset_type}</Text><Text style={styles.price}>{asset.quantity} {asset.unit ?? "unit"}</Text></View>) : <Text style={styles.muted}>No stake records have been added to your profile yet.</Text>}
       </View>}
       {user.role === "admin" && <View style={styles.panel}><Text style={styles.heading}>Administrator access</Text><Text style={styles.muted}>Use the web portal for live sales analytics, location-level reports, member and staff management, and the full audit trail.</Text></View>}
       {user.role === "staff" && <View style={styles.panel}>
@@ -130,7 +130,8 @@ export default function App() {
         <View style={styles.paymentRow}>{(["cash", "mobile_money", "bank", "wallet"] as const).map((method) =>
           <TouchableOpacity key={method} style={[styles.paymentOption, paymentMethod === method && styles.paymentOptionActive]} onPress={() => setPaymentMethod(method)}>
             <Text style={[styles.paymentOptionText, paymentMethod === method && styles.paymentOptionTextActive]}>{method.replace("_", " ")}</Text>
-          </TouchableOpacity>)}</View>
+          </TouchableOpacity>)}
+        </View>
         <TouchableOpacity style={styles.primaryButton} onPress={() => void recordSale()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Saving…" : "Record sale"}</Text></TouchableOpacity>
         <Text style={styles.mutedSmall}>Mobile money and bank settlement require provider integration; those methods are not marked as paid by this first version.</Text>
       </View>}
@@ -180,6 +181,9 @@ const styles = StyleSheet.create({
   receiptStatus: { alignSelf: "flex-start", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 12 },
   receiptStatusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
   receiptFooter: { color: "#78877f", fontSize: 11, textAlign: "center", marginTop: 16, lineHeight: 17 },
-  paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 }, paymentOption: { borderWidth: 1, borderColor: "#cbd8ce", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 11 }, paymentOptionActive: { borderColor: "#039dfc", backgroundColor: "#e5f5ff" }, paymentOptionText: { textTransform: "capitalize", color: "#52675a", fontSize: 11, fontWeight: "700" }, paymentOptionTextActive: { color: "#039dfc" },
-  cameraFrame: { height: 340, borderRadius: 12, overflow: "hidden", marginVertical: 12 }, camera: { flex: 1 }, verifiedBox: { borderRadius: 10, backgroundColor: "#e5f5ff", padding: 14, marginTop: 10 }, verifiedTitle: { fontWeight: "800", color: "#1b683e" }, link: { color: "#0c6a4b", textDecorationLine: "underline", marginTop: 8, fontSize: 12 }, footer: { color: "#839087", textAlign: "center", fontSize: 10, marginTop: 20 }
-});
+  passwordRow: { flexDirection: "row", alignItems: "center" },
+  passwordInput: { flex: 1 },
+  passwordToggle: { marginLeft: 10, justifyContent: "center" },
+  link: { color: "#0c6a4b", textDecorationLine: "underline", fontSize: 12, fontWeight: "700", marginTop: 8 },
+  footer: { color: "#83908a", textAlign: "center", fontSize: 10, marginTop: 20 }
+}));

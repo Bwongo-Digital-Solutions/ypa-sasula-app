@@ -21,6 +21,7 @@ export default function App() {
   const [qrToken, setQrToken] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "mobile_money" | "bank" | "wallet">("cash");
   const [verifiedMember, setVerifiedMember] = useState<{ memberNumber: string; name: string; discountRate: number } | null>(null);
+  const [lastReceipt, setLastReceipt] = useState<{ receipt_number: string; gross_amount?: number | string; discount_amount: number | string; net_amount: number | string; payment_status: string; payment_method?: string; created_at?: string; member_name?: string | null; member_number?: string | null } | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -83,9 +84,10 @@ export default function App() {
     if (qrToken && !verifiedMember) { Alert.alert("Verify member", "Scan a valid member QR code before applying a discount."); return; }
     setLoading(true);
     try {
-      const result = await request<{ transaction: { receipt_number: string; net_amount: number | string; payment_status: string; discount_amount: number | string } }>("/transactions", "POST", {
+      const result = await request<{ transaction: { receipt_number: string; gross_amount?: number | string; net_amount: number | string; payment_status: string; discount_amount: number | string; created_at?: string } }>("/transactions", "POST", {
         ...(verifiedMember ? { qrToken } : {}), paymentMethod, items: selected
       });
+      setLastReceipt({ ...result.transaction, payment_method: paymentMethod, member_name: verifiedMember?.name ?? null, member_number: verifiedMember?.memberNumber ?? null });
       const pendingNote = result.transaction.payment_status === "pending" ? "\nPayment status: PENDING — verify settlement with the provider before releasing the order." : "";
       Alert.alert(result.transaction.payment_status === "pending" ? "Payment pending" : "Sale recorded", `${result.transaction.receipt_number}\nDiscount: UGX ${Number(result.transaction.discount_amount).toLocaleString()}\nNet: UGX ${Number(result.transaction.net_amount).toLocaleString()}${pendingNote}`);
       setCounts({}); setQrToken(""); setVerifiedMember(null); setScanned(false);
@@ -93,7 +95,7 @@ export default function App() {
     finally { setLoading(false); }
   };
 
-  const signOut = () => { setToken(""); setUser(null); setMember(null); setItems([]); setVerifiedMember(null); setQrToken(""); setCounts({}); };
+  const signOut = () => { setToken(""); setUser(null); setMember(null); setItems([]); setVerifiedMember(null); setQrToken(""); setCounts({}); setLastReceipt(null); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="dark" /><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <View style={styles.brandRow}><Image source={require("./assets/ypa-logo.jpg")} style={styles.brandLogo} resizeMode="contain" /><View><Text style={styles.brandTitle}>YPA Sasula</Text><Text style={styles.brandSub}>Member discounts, made visible</Text></View></View>
@@ -131,6 +133,23 @@ export default function App() {
         <TouchableOpacity style={styles.primaryButton} onPress={() => void recordSale()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Saving…" : "Record sale"}</Text></TouchableOpacity>
         <Text style={styles.mutedSmall}>Mobile money and bank settlement require provider integration; those methods are not marked as paid by this first version.</Text>
       </View>}
+      {user.role === "staff" && lastReceipt && <View style={styles.receiptPanel}>
+        <View style={styles.receiptBrand}>
+          <Image source={require("./assets/ypa-logo.jpg")} style={styles.receiptLogo} resizeMode="contain" />
+          <Text style={styles.receiptBrandTitle}>YOUTH PLATFORM AFRICA</Text>
+          <Text style={styles.receiptBrandSubtitle}>YPA SASULA · TRANSACTION RECEIPT</Text>
+        </View>
+        <Text style={styles.receiptHeading}>Receipt {lastReceipt.receipt_number}</Text>
+        <Text style={styles.receiptMuted}>{lastReceipt.created_at ? new Date(lastReceipt.created_at).toLocaleString() : new Date().toLocaleString()}</Text>
+        <View style={styles.receiptLine}><Text style={styles.receiptLabel}>Member</Text><Text style={styles.receiptValue}>{lastReceipt.member_name || "Walk-in customer"}</Text></View>
+        {lastReceipt.member_number ? <View style={styles.receiptLine}><Text style={styles.receiptLabel}>Member ID</Text><Text style={styles.receiptValue}>{lastReceipt.member_number}</Text></View> : null}
+        <View style={styles.receiptLine}><Text style={styles.receiptLabel}>Payment method</Text><Text style={styles.receiptValue}>{(lastReceipt.payment_method || paymentMethod).replace("_", " ").toUpperCase()}</Text></View>
+        {lastReceipt.gross_amount !== undefined ? <View style={styles.receiptLine}><Text style={styles.receiptLabel}>Gross total</Text><Text style={styles.receiptValue}>UGX {Number(lastReceipt.gross_amount).toLocaleString()}</Text></View> : null}
+        <View style={styles.receiptLine}><Text style={styles.receiptLabel}>Discount</Text><Text style={styles.receiptValue}>− UGX {Number(lastReceipt.discount_amount).toLocaleString()}</Text></View>
+        <View style={styles.receiptTotal}><Text style={styles.receiptTotalLabel}>NET TOTAL</Text><Text style={styles.receiptTotalValue}>UGX {Number(lastReceipt.net_amount).toLocaleString()}</Text></View>
+        <View style={styles.receiptStatus}><Text style={styles.receiptStatusText}>PAYMENT: {lastReceipt.payment_status.toUpperCase()}</Text></View>
+        <Text style={styles.receiptFooter}>Thank you. Keep this YPA receipt for your records.</Text>
+      </View>}
     </>}
     <Text style={styles.footer}>YPA Sasula · Secure member verification</Text>
   </ScrollView></SafeAreaView>;
@@ -144,6 +163,22 @@ const styles = StyleSheet.create({
   welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }, eyebrow: { letterSpacing: 1.2, color: "#6a7b70", fontSize: 10, fontWeight: "800" }, signOut: { color: "#039dfc", fontWeight: "700" }, memberNo: { color: "#597064", letterSpacing: 1.4, fontWeight: "700", fontSize: 12 },
   qrBox: { backgroundColor: "#fff", alignItems: "center", justifyContent: "center", padding: 18, marginVertical: 20 }, statusPill: { alignSelf: "center", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 }, statusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 }, memberStats: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 22, borderBottomWidth: 1, borderColor: "#e9efea", marginBottom: 20 }, statLabel: { fontSize: 11, color: "#6b7c71", marginBottom: 6 }, statValue: { fontSize: 18, color: "#173c2d", fontWeight: "800" },
   sectionTitle: { fontSize: 15, color: "#294537", fontWeight: "800", marginTop: 15, marginBottom: 5 }, listRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderColor: "#edf1ed" }, itemName: { fontSize: 13, color: "#263d30", fontWeight: "700" }, price: { fontSize: 13, color: "#14543a", fontWeight: "800" }, counterButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: "#b6cabc" }, counterText: { color: "#0c633f", fontWeight: "800", fontSize: 18 }, quantity: { minWidth: 20, textAlign: "center", fontWeight: "800" },
+  receiptPanel: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#b8dff7", padding: 20, marginBottom: 16 },
+  receiptBrand: { alignItems: "center", borderBottomWidth: 2, borderBottomColor: "#039dfc", paddingBottom: 16, marginBottom: 14 },
+  receiptLogo: { width: 86, height: 74, marginBottom: 8 },
+  receiptBrandTitle: { color: "#039dfc", fontSize: 13, fontWeight: "900", letterSpacing: 1 },
+  receiptBrandSubtitle: { color: "#607487", fontSize: 10, marginTop: 5, textAlign: "center" },
+  receiptHeading: { color: "#173c2d", fontSize: 18, fontWeight: "900", marginBottom: 4 },
+  receiptMuted: { color: "#78877f", fontSize: 11, marginBottom: 12 },
+  receiptLine: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: "#edf1ed" },
+  receiptLabel: { color: "#69796f", fontSize: 12, flex: 1 },
+  receiptValue: { color: "#263d30", fontSize: 12, fontWeight: "700", flex: 1, textAlign: "right" },
+  receiptTotal: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 14, marginTop: 4 },
+  receiptTotalLabel: { color: "#173c2d", fontSize: 12, fontWeight: "900" },
+  receiptTotalValue: { color: "#039dfc", fontSize: 19, fontWeight: "900" },
+  receiptStatus: { alignSelf: "flex-start", backgroundColor: "#e5f5ff", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 12 },
+  receiptStatusText: { color: "#1c6f3b", fontSize: 10, fontWeight: "900", letterSpacing: 0.5 },
+  receiptFooter: { color: "#78877f", fontSize: 11, textAlign: "center", marginTop: 16, lineHeight: 17 },
   paymentRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 }, paymentOption: { borderWidth: 1, borderColor: "#cbd8ce", borderRadius: 7, paddingVertical: 9, paddingHorizontal: 11 }, paymentOptionActive: { borderColor: "#039dfc", backgroundColor: "#e5f5ff" }, paymentOptionText: { textTransform: "capitalize", color: "#52675a", fontSize: 11, fontWeight: "700" }, paymentOptionTextActive: { color: "#039dfc" },
   cameraFrame: { height: 340, borderRadius: 12, overflow: "hidden", marginVertical: 12 }, camera: { flex: 1 }, verifiedBox: { borderRadius: 10, backgroundColor: "#e5f5ff", padding: 14, marginTop: 10 }, verifiedTitle: { fontWeight: "800", color: "#1b683e" }, link: { color: "#0c6a4b", textDecorationLine: "underline", marginTop: 8, fontSize: 12 }, footer: { color: "#839087", textAlign: "center", fontSize: 10, marginTop: 20 }
 });

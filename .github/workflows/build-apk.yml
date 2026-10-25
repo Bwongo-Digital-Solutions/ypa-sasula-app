@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_NO_AUTH_TEST_MODE: "true"
       RELEASE_TAG: ${{ github.event.release.tag_name || format('build-{0}', github.run_number) }}
     steps:
       - name: Check out source

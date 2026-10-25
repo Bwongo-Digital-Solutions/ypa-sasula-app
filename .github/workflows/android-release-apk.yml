@@ -138,7 +138,7 @@ jobs:
           release_block = text[release_start:release_close]
           release_block = re.sub(r"(?m)^([ \t]*)signingConfig[ \t]+signingConfigs\.debug[ \t]*$", r"\1signingConfig signingConfigs.release", release_block)
           if "signingConfig signingConfigs.release" not in release_block:
-          release_block = re.sub(r"(?m)^([ \t]*)signingConfig[ \t]+signingConfigs\.debug[ \t]*$", r"\1signingConfig signingConfigs.release", release_block)
+              release_block = re.sub(r"(?m)^([ \t]*)release[ \t]*\{", r"\1release {\n\1    signingConfig signingConfigs.release", release_block, count=1)
           text = text[:release_start] + release_block + text[release_close:]
           path.write_text(text)
           PY

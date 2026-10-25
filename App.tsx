@@ -186,4 +186,4 @@ const styles = StyleSheet.create({
   passwordToggle: { marginLeft: 10, justifyContent: "center" },
   link: { color: "#0c6a4b", textDecorationLine: "underline", fontSize: 12, fontWeight: "700", marginTop: 8 },
   footer: { color: "#83908a", textAlign: "center", fontSize: 10, marginTop: 20 }
-}));
+});

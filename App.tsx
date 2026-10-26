@@ -5,7 +5,8 @@ import QRCode from "react-native-qrcode-svg";
 import { StatusBar } from "expo-status-bar";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
-const NO_AUTH_TEST_MODE = process.env.EXPO_PUBLIC_NO_AUTH_TEST_MODE === "true";
+// This branch is a dedicated test build: bypass the credential screen and auto-enter through the backend test-access endpoint.
+const NO_AUTH_TEST_MODE = true;
 type Role = "admin" | "staff" | "member";
 type User = { id: string; displayName: string; email: string; role: Role; locationId: string | null; memberId: string | null };
 type CatalogItem = { id: string; name: string; price: number; sku: string | null };

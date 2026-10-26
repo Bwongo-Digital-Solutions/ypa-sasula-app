@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import QRCode from "react-native-qrcode-svg";
@@ -28,6 +28,8 @@ export default function App() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const autoSignInStarted = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
 
   const request = async <T,>(path: string, method = "GET", body?: unknown): Promise<T> => {
@@ -60,14 +62,25 @@ export default function App() {
 
   const signIn = async () => {
     setLoading(true);
+    setAuthError("");
     try {
       const response = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(NO_AUTH_TEST_MODE ? { testRole } : { email, password }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Sign-in failed.");
       setToken(payload.token); setUser(payload.user);
-    } catch (e) { Alert.alert("Sign-in failed", e instanceof Error ? e.message : "Check your connection."); }
-    finally { setLoading(false); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Check your connection.";
+      if (NO_AUTH_TEST_MODE) setAuthError(message);
+      else Alert.alert("Sign-in failed", message);
+    } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (NO_AUTH_TEST_MODE && !autoSignInStarted.current) {
+      autoSignInStarted.current = true;
+      void signIn();
+    }
+  }, []);
 
   const scanCode = async (value: string) => {
     setScanned(true); setCameraOpen(false); setQrToken(value);
@@ -102,15 +115,19 @@ export default function App() {
 
   return <SafeAreaView style={styles.safe}><StatusBar style="dark" /><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <View style={styles.brandRow}><Image source={require("./assets/ypa-logo.jpg")} style={styles.brandLogo} resizeMode="contain" /><View><Text style={styles.brandTitle}>YPA Sasula</Text><Text style={styles.brandSub}>Member discounts, made visible</Text></View></View>
-    {!user ? <View style={styles.panel}>
-      <Text style={styles.heading}>{NO_AUTH_TEST_MODE ? "Test access (no credentials)" : "Sign in"}</Text><Text style={styles.muted}>{NO_AUTH_TEST_MODE ? "Development-only shortcut. Select a role; an existing active account of that role is used." : "Use the account provided by YPA."}</Text>
-      {NO_AUTH_TEST_MODE && <View style={styles.paymentRow}>{(["admin", "staff", "member"] as Role[]).map((role) => <TouchableOpacity key={role} style={[styles.paymentOption, testRole === role && styles.paymentOptionActive]} onPress={() => setTestRole(role)}><Text style={[styles.paymentOptionText, testRole === role && styles.paymentOptionTextActive]}>{role.toUpperCase()}</Text></TouchableOpacity>)}</View>}
-      {!NO_AUTH_TEST_MODE && <><Text style={styles.label}>Email address</Text><TextInput autoCapitalize="none" keyboardType="email-address" style={styles.input} value={email} onChangeText={setEmail} placeholder="name@example.com" />
+    {!user ? (NO_AUTH_TEST_MODE ? <View style={styles.panel}>
+      <ActivityIndicator size="large" color="#039dfc" />
+      <Text style={styles.heading}>{loading ? "Opening YPA Sasula…" : "Unable to connect"}</Text>
+      <Text style={styles.muted}>{loading ? "Connecting automatically to the test workspace. No login is required in this build." : authError || "The test workspace could not be opened."}</Text>
+      {!loading && <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()}><Text style={styles.primaryText}>Retry connection</Text></TouchableOpacity>}
+      <Text style={styles.mutedSmall}>NO-AUTH TEST BUILD — for testing only, never use in production.</Text>
+    </View> : <View style={styles.panel}>
+      <Text style={styles.heading}>Sign in</Text><Text style={styles.muted}>Use the account provided by YPA.</Text>
+      <Text style={styles.label}>Email address</Text><TextInput autoCapitalize="none" keyboardType="email-address" style={styles.input} value={email} onChangeText={setEmail} placeholder="name@example.com" />
       <Text style={styles.label}>Password</Text><View style={styles.passwordField}><TextInput secureTextEntry={!showPassword} style={styles.passwordInput} value={password} onChangeText={setPassword} placeholder="Your password" autoCapitalize="none" autoCorrect={false} /><TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} onPress={() => setShowPassword((visible) => !visible)} style={styles.passwordToggle}><Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "👁"}</Text></TouchableOpacity></View>
-      </>}
       <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()} disabled={loading}><Text style={styles.primaryText}>{loading ? "Signing in…" : "Sign in"}</Text></TouchableOpacity>
-      <Text style={styles.mutedSmall}>{NO_AUTH_TEST_MODE ? "NO-AUTH TEST BUILD — never use this mode in production." : "For local testing, set EXPO_PUBLIC_API_URL to your computer's reachable LAN address."}</Text>
-    </View> : <>
+      <Text style={styles.mutedSmall}>For local testing, set EXPO_PUBLIC_API_URL to your computer's reachable LAN address.</Text>
+    </View>) : <>
       <View style={styles.welcomeRow}><View><Text style={styles.eyebrow}>{user.role.toUpperCase()} PROFILE</Text><Text style={styles.heading}>Hello, {user.displayName.split(" ")[0]}</Text></View><TouchableOpacity onPress={signOut}><Text style={styles.signOut}>Sign out</Text></TouchableOpacity></View>
       {user.role === "member" && member && <View style={styles.panel}>
         <Text style={styles.eyebrow}>DIGITAL MEMBERSHIP CARD</Text><Text style={styles.heading}>{member.firstName} {member.lastName}</Text><Text style={styles.memberNo}>{member.memberNumber}</Text>

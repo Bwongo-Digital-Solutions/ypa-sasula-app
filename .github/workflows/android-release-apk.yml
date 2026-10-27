@@ -24,6 +24,34 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Validate API URL and test public API connectivity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "${EXPO_PUBLIC_API_URL:-}" ]]; then
+            echo "::error::EXPO_PUBLIC_API_URL is not configured. Set it in Settings > Secrets and variables > Actions > Variables to the reachable API base URL ending in /api/v1."
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          const value = process.env.EXPO_PUBLIC_API_URL;
+          let url;
+          try { url = new URL(value); } catch { throw new Error("EXPO_PUBLIC_API_URL must be a valid absolute URL."); }
+          if (!["http:", "https:"].includes(url.protocol)) throw new Error("API URL must use HTTP or HTTPS.");
+          if (url.pathname.replace(/\\/+$/, "") !== "/api/v1") throw new Error("API URL must end in /api/v1.");
+          if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname.toLowerCase())) throw new Error("localhost cannot be used in a phone APK; use a reachable LAN IP or public HTTPS hostname.");
+          const privateIPv4 = /^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|169\\.254\\.)/.test(url.hostname);
+          if (url.protocol === "http:" && !privateIPv4) throw new Error("Use HTTPS for public APIs. Plain HTTP is accepted only for private LAN testing.");
+          console.log("API URL format validated:", url.origin + url.pathname);
+          console.log(url.protocol === "https:" ? "Public HTTPS API will be health-checked." : "Private LAN API: GitHub runners cannot reach your private network; connectivity must be tested from the phone.");
+          NODE
+          if [[ "${EXPO_PUBLIC_API_URL}" == https://* ]]; then
+            API_ORIGIN="$(node -p 'new URL(process.env.EXPO_PUBLIC_API_URL).origin')"
+            curl --fail --show-error --silent --max-time 15 "${API_ORIGIN}/health"
+            echo
+            curl --fail --show-error --silent --max-time 15 "${API_ORIGIN}/ready"
+            echo
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

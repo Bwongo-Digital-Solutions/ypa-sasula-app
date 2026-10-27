@@ -71,7 +71,9 @@ export default function App() {
       if (!response.ok) throw new Error(payload.error ?? "Sign-in failed.");
       setToken(payload.token); setUser(payload.user);
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Check your connection.";
+      const message = e instanceof TypeError
+        ? `Cannot reach the YPA API at ${API || "an unconfigured address"}. For a phone connected to Ubuntu, use the computer's reachable Wi-Fi/hotspot IP (not localhost), make sure the API is running on port 4000, and allow the phone through the firewall.`
+        : e instanceof Error ? e.message : "Check your connection.";
       if (NO_AUTH_TEST_MODE) setAuthError(message);
       else Alert.alert("Sign-in failed", message);
     } finally { setLoading(false); }

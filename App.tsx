@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import QRCode from "react-native-qrcode-svg";
 import { StatusBar } from "expo-status-bar";
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+const API = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\\/+$/, "");
 // This branch is a dedicated test build: bypass the credential screen and auto-enter through the backend test-access endpoint.
 const NO_AUTH_TEST_MODE = true;
 type Role = "admin" | "staff" | "member";
@@ -65,6 +65,7 @@ export default function App() {
     setLoading(true);
     setAuthError("");
     try {
+      if (!API) throw new Error("API URL is not configured in this APK. Set EXPO_PUBLIC_API_URL to your reachable webapp API URL ending in /api/v1, then rebuild.");
       const response = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(NO_AUTH_TEST_MODE ? { testRole } : { email, password }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Sign-in failed.");
@@ -121,6 +122,7 @@ export default function App() {
       <Text style={styles.heading}>{loading ? "Opening YPA Sasula…" : "Unable to connect"}</Text>
       <Text style={styles.muted}>{loading ? "Connecting automatically to the test workspace. No login is required in this build." : authError || "The test workspace could not be opened."}</Text>
       {!loading && <TouchableOpacity style={styles.primaryButton} onPress={() => void signIn()}><Text style={styles.primaryText}>Retry connection</Text></TouchableOpacity>}
+      <Text style={styles.mutedSmall}>API address: {API || "NOT CONFIGURED"}{API.includes("localhost") || API.includes("127.0.0.1") ? "\\nThis address points to the phone itself, not your Ubuntu computer. Rebuild with the computer's reachable IP or a public HTTPS API URL." : ""}</Text>
       <Text style={styles.mutedSmall}>NO-AUTH TEST BUILD — for testing only, never use in production.</Text>
     </View> : <View style={styles.panel}>
       <Text style={styles.heading}>Sign in</Text><Text style={styles.muted}>Use the account provided by YPA.</Text>

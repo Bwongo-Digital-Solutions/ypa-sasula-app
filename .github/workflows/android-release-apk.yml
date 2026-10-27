@@ -41,7 +41,8 @@ jobs:
           if (url.pathname !== "/api/v1") throw new Error("API URL must end in /api/v1.");
           if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname.toLowerCase())) throw new Error("localhost cannot be used in a phone APK; use a reachable LAN IP or public HTTPS hostname.");
           const host = url.hostname;
-          const privateIPv4 = host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("172.16.") || host.startsWith("172.17.") || host.startsWith("172.18.") || host.startsWith("172.19.") || host.startsWith("172.2") || host.startsWith("172.30.") || host.startsWith("172.31.") || host.startsWith("169.254.");
+          const secondOctet = host.split(".")[1];
+          const privateIPv4 = host.startsWith("10.") || host.startsWith("192.168.") || (host.startsWith("172.") && Number(secondOctet) >= 16 && Number(secondOctet) <= 31) || host.startsWith("169.254.");
           if (url.protocol === "http:" && !privateIPv4) throw new Error("Use HTTPS for public APIs. Plain HTTP is accepted only for private LAN testing.");
           console.log("API URL format validated:", url.origin + url.pathname);
           console.log(url.protocol === "https:" ? "Public HTTPS API will be health-checked." : "Private LAN API: GitHub runners cannot reach your private network; connectivity must be tested from the phone.");

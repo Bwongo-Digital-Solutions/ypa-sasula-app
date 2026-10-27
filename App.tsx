@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import QRCode from "react-native-qrcode-svg";
 import { StatusBar } from "expo-status-bar";
 
-const API = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\\/+$/, "");
+const API = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 // This branch is a dedicated test build: bypass the credential screen and auto-enter through the backend test-access endpoint.
 const NO_AUTH_TEST_MODE = true;
 type Role = "admin" | "staff" | "member";
